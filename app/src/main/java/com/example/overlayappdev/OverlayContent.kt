@@ -1,9 +1,12 @@
 package com.example.overlayappdev
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,6 +18,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -49,28 +56,44 @@ fun OverlayContent(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(
-                    onClick = onPipMode,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 4.dp)
+            if(!isPipMode) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Text(if (isPipMode) "Expand" else "PiP Mode")
-                }
+                    Button(
+                        onClick = onPipMode,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 4.dp)
+                    ) {
+                        Text(if (isPipMode) "Expand" else "PiP Mode")
+                    }
 
-                Button(
-                    onClick = onClose,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 4.dp)
-                ) {
-                    Text("Close")
+                    Button(
+                        onClick = onClose,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 4.dp)
+                    ) {
+                        Text("Close")
+                    }
                 }
             }
+
+            if(isPipMode)
+            {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                    contentDescription = "sample pic",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable {
+                        onPipMode()
+                    }
+                )
+            }
+
         }
     }
 }
