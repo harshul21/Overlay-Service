@@ -3,9 +3,11 @@ package com.example.overlayappdev
 import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,8 +39,8 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 class OverlayService : Service() {
     private var windowManager: WindowManager? = null
     private var overlayView: ComposeView? = null
+    private var isPipMode by mutableStateOf(false)
 
-    // Combined LifecycleOwner and SavedStateRegistryOwner
     private inner class OverlayStateOwner : LifecycleOwner, SavedStateRegistryOwner {
         private val lifecycleRegistry = LifecycleRegistry(this)
         private val savedStateRegistryController = SavedStateRegistryController.create(this).apply {
@@ -65,84 +70,65 @@ class OverlayService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
-        // Initialize the lifecycle state
         stateOwner.create()
 
-        // Create the overlay view using Compose
         overlayView = ComposeView(this).apply {
-            // Set the combined owner for both lifecycle and saved state
             setViewTreeLifecycleOwner(stateOwner)
             setViewTreeSavedStateRegistryOwner(stateOwner)
 
             setContent {
                 OverlayContent(
-                    onClose = { stopSelf() }
+                    onClose = { stopSelf() },
+                    onPipMode = { togglePipMode() },
+                    isPipMode = isPipMode
                 )
             }
         }
 
-        // Set up window parameters
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.CENTER
-            x = 0
-            y = 0
-        }
-
-        // Add the view to window manager
-        windowManager?.addView(overlayView, params)
-
-        // Move to RESUMED state after adding the view
+        updateOverlayLayout(isPipMode)
         stateOwner.resume()
     }
 
-    override fun onDestroy() {
-        // Move to DESTROYED state
-        stateOwner.destroy()
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun togglePipMode() {
+        isPipMode = !isPipMode
+        updateOverlayLayout(isPipMode)
+    }
 
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun updateOverlayLayout(isPip: Boolean) {
+        val params = WindowManager.LayoutParams(
+            if (isPip) 500 else WindowManager.LayoutParams.WRAP_CONTENT,
+            if (isPip) 400 else WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = if (isPip) Gravity.END or Gravity.BOTTOM else Gravity.CENTER
+            x = 0
+            y = 100
+        }
+
+        overlayView?.let { view ->
+            try {
+                windowManager?.updateViewLayout(view, params)
+            } catch (e: IllegalArgumentException) {
+                windowManager?.addView(view, params)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        stateOwner.destroy()
         overlayView?.let { windowManager?.removeView(it) }
         super.onDestroy()
     }
 }
 
 
-@Composable
-fun OverlayContent(onClose: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .background(Color.Black)
-            .padding(16.dp)
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .background(Color.Green, shape = RoundedCornerShape(8.dp))
-                .padding(16.dp)
-        ) {
-            Text(
-                text = "Hello from Overlay",
-                color = Color.Black,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            Button(onClick = onClose) {
-                Text(text = "Close")
-            }
-            Button(onClick = onClose) {
-                Text(text = "Pip")
-            }
-
-        }
-    }
-}
